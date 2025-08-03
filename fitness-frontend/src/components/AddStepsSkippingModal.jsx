@@ -8,6 +8,7 @@ const AddStepsSkippingModal = ({ isOpen, onClose, currentData, userId, onUpdate 
   const [newSkipping, setNewSkipping] = useState('');
   const [stepsImage, setStepsImage] = useState(null);
   const [skippingImage, setSkippingImage] = useState(null);
+  const token = localStorage.getItem("token");
   const [error, setError] = useState('');
   const BASE_URL = process.env.REACT_APP_API_URL;
   useEffect(() => {
@@ -37,13 +38,11 @@ const AddStepsSkippingModal = ({ isOpen, onClose, currentData, userId, onUpdate 
     e.preventDefault();
     setError('');
 
-    // Validate input presence
     if (newSteps === '' && newSkipping === '') {
       setError('Please enter at least one new count.');
       return;
     }
 
-    // Validate numbers
     const ns = Number(newSteps);
     const nk = Number(newSkipping);
 
@@ -53,7 +52,7 @@ const AddStepsSkippingModal = ({ isOpen, onClose, currentData, userId, onUpdate 
         return;
       }
       if (!stepsImage) {
-        setError('Please attach an image proof for Steps.');
+        setError('Please attach a proof for Steps.');
         return;
       }
     }
@@ -64,42 +63,46 @@ const AddStepsSkippingModal = ({ isOpen, onClose, currentData, userId, onUpdate 
         return;
       }
       if (!skippingImage) {
-        setError('Please attach an image proof for Skipping.');
+        setError('Please attach a proof for Skipping.');
         return;
       }
     }
 
-    // Prepare form data
+    const isVideo = (file) => file && file.type.startsWith('video/');
+    const isStepsVideo = stepsImage && isVideo(stepsImage);
+    const isSkippingVideo = skippingImage && isVideo(skippingImage);
+    const isVideoUpload = isStepsVideo || isSkippingVideo;
+
     const formData = new FormData();
     formData.append('date', todayStr);
     formData.append('userId', userId);
 
-    if (newSteps !== '') {
-      formData.append('steps', ns);
-      formData.append('stepsImage', stepsImage);
-    }
-    if (newSkipping !== '') {
-      formData.append('skipping', nk);
-      formData.append('skippingImage', skippingImage);
+    let endpoint = `${BASE_URL}/api/fitness/steps-skipping`;
+
+    if (isVideoUpload) {
+      endpoint = `${BASE_URL}/api/fitness/upload-video`;
+      formData.append('video', isSkippingVideo ? skippingImage : stepsImage);
+      formData.append('skipping', nk); // ✅ use correct field name
+    } else {
+      if (newSteps !== '') {
+        formData.append('steps', ns);
+        formData.append('stepsImage', stepsImage);
+      }
+      if (newSkipping !== '') {
+        formData.append('skipping', nk);
+        formData.append('skippingImage', skippingImage);
+      }
     }
 
     try {
-      //console.log("🟡 DEBUG FORM DATA:");
-      //console.log("userId", userId);
-      //console.log("typeof userId", typeof userId);
-      for (let pair of formData.entries()) {
-        //console.log(pair[0], pair[1]);
-      }
-
-
-        const res = await axios.post(`${BASE_URL}/api/fitness/steps-skipping`, formData, {
+      const res = await axios.post(endpoint, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`,  // 🔥 this is what was missing
         },
       });
-
       if (res.data.success) {
-        onUpdate(res.data.updatedData);
+        onUpdate(res.data.updatedData || res.data.updated); // handle both response shapes
         onClose();
       } else {
         setError(res.data.message || 'Failed to update.');
@@ -109,6 +112,8 @@ const AddStepsSkippingModal = ({ isOpen, onClose, currentData, userId, onUpdate 
       console.error(err);
     }
   };
+
+
 
   const [year, month, day] = todayStr.split("-");
   const formattedToday = `${day}-${month}-${year}`;
@@ -178,7 +183,7 @@ const AddStepsSkippingModal = ({ isOpen, onClose, currentData, userId, onUpdate 
           <input
             id="skippingImage"
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             onChange={(e) => setSkippingImage(e.target.files[0])}
           />
         </div>

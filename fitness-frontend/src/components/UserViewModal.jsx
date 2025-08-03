@@ -6,15 +6,25 @@
           const [dataByDate, setDataByDate] = useState({});
           const [page, setPage] = useState(1);
           const [hasMore, setHasMore] = useState(true);
+          const [previewSrc, setPreviewSrc] = useState(null);
+          const [previewType, setPreviewType] = useState(null);
 
           useEffect(() => {
             if (!isOpen) return;
 
             const load = async () => {
               try {
-                const today = new Date().toISOString().slice(0, 10); // or pass a fixed date if needed
-                const resp = await fetchUserUploads(userId, period, page, today);
-
+                let refDate;
+                if (period.toLowerCase() === 'lastmonth') {
+                  const now = new Date();
+                  const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+                  refDate = lastDayOfLastMonth.toLocaleDateString('sv-SE'); // "YYYY-MM-DD"
+                } else {
+                  refDate = new Date().toLocaleDateString('sv-SE');
+                }
+                //console.log(refDate);
+                const resp = await fetchUserUploads(userId, period, page, refDate);
+                //console.log(period);
                 //console.log("📦 Raw response:", resp);
 
                 const meals = resp.mealsByDate || {};
@@ -74,6 +84,37 @@
             wtd: 'Week to Date',
             mtd: 'Month to Date',
           };
+          const MediaPreviewModal = ({ src, type, onClose }) => {
+            if (!src) return null;
+
+            return (
+              <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
+                <button
+                  onClick={onClose}
+                  className="absolute top-4 right-4 z-50 bg-white text-black rounded-full w-10 h-10 flex items-center justify-center text-xl shadow-lg"
+                >
+                  &times;
+                </button>
+
+                {type === 'video' ? (
+                  <video
+                    controls
+                    autoPlay
+                    className="w-full h-full max-h-screen max-w-screen object-contain rounded"
+                  >
+                    <source src={src} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                ) : (
+                  <img
+                    src={src}
+                    alt="Preview"
+                    className="w-full h-full max-h-screen max-w-screen object-contain rounded"
+                  />
+                )}
+              </div>
+            );
+          };
 
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -87,7 +128,7 @@
 
                 <h2 className="text-xl font-semibold mb-4">
                   
-                  <h2>User Uploads ({periodLabels[period] || period})</h2>
+                  User Uploads ({periodLabels[period] || period})
                 </h2>
 
                 {noDates ? (
@@ -121,7 +162,11 @@
                                 <img
                                   src={progress.stepsProof}
                                   alt="Steps Proof"
-                                  className="w-24 h-24 object-cover rounded border"
+                                  className="w-24 h-24 object-cover rounded border cursor-pointer"
+                                  onClick={() => {
+                                    setPreviewSrc(progress.stepsProof);
+                                    setPreviewType('image');
+                                  }}
                                 />
                               </div>
                             ) : (
@@ -133,15 +178,44 @@
                             {hasSkipping ? (
                               <div>
                                 <p className="text-sm">Skipping:</p>
+                                    {progress.skippingProof.endsWith(".mp4") ? (
+                                <video
+                                  controls
+                                  className="w-32 h-32 rounded border cursor-pointer"
+                                  onClick={() => {
+                                    setPreviewSrc(
+                                      progress.skippingProof?.startsWith('http')
+                                        ? progress.skippingProof
+                                        : `${process.env.REACT_APP_API_URL}/${progress.skippingProof}`
+                                    );
+                                    setPreviewType('video');
+                                  }}
+                                >
+                                  <source
+                                    src={
+                                      progress.skippingProof?.startsWith('http')
+                                        ? progress.skippingProof
+                                        : `${process.env.REACT_APP_API_URL}/${progress.skippingProof}`
+                                    }
+                                    type="video/mp4"
+                                  />
+                                  Your browser does not support the video tag.
+                                </video>
+                                ) : (
                                 <img
                                   src={progress.skippingProof}
                                   alt="Skipping Proof"
-                                  className="w-24 h-24 object-cover rounded border"
+                                  className="w-24 h-24 object-cover rounded border cursor-pointer"
+                                  onClick={() => {
+                                    setPreviewSrc(progress.skippingProof);
+                                    setPreviewType('image');
+                                  }}
                                 />
+                                )}
                               </div>
                             ) : (
                               <p className="text-sm text-gray-500">
-                                No skipping image
+                                No skipping image/video
                               </p>
                             )}
                           </div>
@@ -158,11 +232,13 @@
                                   meals[type].map((img, i) => (
                                     <img
                                       key={i}
-                                      src={
-                                        typeof img === 'string' ? img : img.url
-                                      }
+                                      src={typeof img === 'string' ? img : img.url}
                                       alt={`${type} ${i + 1}`}
-                                      className="w-24 h-24 object-cover rounded border"
+                                      className="w-24 h-24 object-cover rounded border cursor-pointer"
+                                      onClick={() => {
+                                        setPreviewSrc(typeof img === 'string' ? img : img.url);
+                                        setPreviewType('image');
+                                      }}
                                     />
                                   ))
                                 ) : (
@@ -197,6 +273,15 @@
                   </button>
                 </div>
               </div>
+              <MediaPreviewModal
+                src={previewSrc}
+                type={previewType}
+                onClose={() => {
+                  setPreviewSrc(null);
+                  setPreviewType(null);
+                }}
+              />
+
             </div>
           );
         };

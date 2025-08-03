@@ -7,6 +7,7 @@ const periodMap = {
   yesterday: "yesterday",
   wtd: "weekly",
   mtd: "monthly",
+  lastMonth: "lastMonth",
 };
 
 const LeaderboardPage = () => {
@@ -48,6 +49,7 @@ const LeaderboardPage = () => {
           <option value="yesterday">Yesterday</option>
           <option value="wtd">Week to Date</option>
           <option value="mtd">Month to Date</option>
+          <option value="lastMonth">Last Month</option>
         </select>
       </div>
 
